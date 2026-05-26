@@ -10,7 +10,6 @@ st.set_page_config(
     layout="wide"
 )
 
-# Estilos visuales corporativos UCR
 st.markdown("""
     <style>
     .stApp { background-color: #ffffff; }
@@ -24,7 +23,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Encabezado con Logo y Acrónimo UCR - ORH
 st.markdown("""
 <div class="identidad-encabezado">
     <img src="https://ucr.ac.cr/medios/imagenes/2015/firma-ucr-institucional-azul.png" width="300px" alt="UCR logo">
@@ -48,7 +46,7 @@ if "contenido_perfil" not in st.session_state:
 # 2. Conexión segura con Gemini
 if "GEMINI_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel('gemini-2.0-flash')  # FIX: modelo actualizado
 else:
     st.error("Falta la configuración de la clave de seguridad (API Key) en los Secrets.")
     st.stop()
@@ -72,7 +70,6 @@ def detectar_candidato(texto_cv):
         except Exception as e:
             st.session_state["nombre_candidato"] = f"Error al detectar: {e}"
 
-# Función para extraer texto de archivos
 def extraer_texto(archivo):
     texto = ""
     try:
@@ -97,8 +94,6 @@ col1, col2 = st.columns(2)
 
 with col1:
     st.markdown('<div class="section-header">1. Perfil del Puesto / Requisitos</div>', unsafe_allow_html=True)
-
-    # Igual que el CV: selector de método
     metodo_perfil = st.radio("Seleccione el método de carga para el Perfil:", ("Subir archivo (PDF, DOCX, TXT)", "Pegar texto manualmente"), key="radio_perfil")
 
     if metodo_perfil == "Subir archivo (PDF, DOCX, TXT)":
@@ -126,7 +121,6 @@ with col1:
 
 with col2:
     st.markdown('<div class="section-header">2. Currículum Vitae (CV) - Carga ORH</div>', unsafe_allow_html=True)
-
     metodo_carga = st.radio("Seleccione el método de carga para el CV:", ("Subir archivo (PDF, DOCX, TXT)", "Pegar texto manualmente"), key="radio_cv")
 
     if metodo_carga == "Subir archivo (PDF, DOCX, TXT)":
@@ -152,33 +146,65 @@ with col2:
         )
         st.session_state["contenido_cv"] = cv_texto
 
-# Tomar contenidos finales
+# Leer contenidos finales desde session_state
 perfil_puesto = st.session_state["contenido_perfil"]
 cv_final = st.session_state["contenido_cv"]
+
+# Leer nombres detectados (siempre desde session_state, ya actualizados)
+nombre_candidato = st.session_state["nombre_candidato"]
+nombre_puesto = st.session_state["nombre_puesto"]
 
 # 4. Cuadro de Metadatos
 st.markdown('<div class="section-header">🔍 Detección Automática de Variables - ORH</div>', unsafe_allow_html=True)
 st.markdown(f"""
 <div class="metadata-box">
-    <strong>📋 Puesto Identificado:</strong> {st.session_state["nombre_puesto"]} <br>
-    <strong>👤 Candidato Identificado:</strong> {st.session_state["nombre_candidato"]}
+    <strong>📋 Puesto Identificado:</strong> {nombre_puesto} <br>
+    <strong>👤 Candidato Identificado:</strong> {nombre_candidato}
 </div>
 """, unsafe_allow_html=True)
 
-# 5. Construcción dinámica del Prompt Maestro
-prompt_completo = f"Actúa como un Consultor Experto en Reclutamiento y Selección de Personal de la Oficina de Recursos Humanos (ORH) de la Universidad de Costa Rica (UCR). Tu objetivo es realizar un análisis técnico con el rigor técnico institucional para evaluar el nivel de ajuste del candidato frente al perfil oficial.\n\nPor favor, genera un 'Reporte de Evaluación y Ajuste de Candidatos' estructurado con las siguientes secciones:\n\n### 1. RESUMEN EJECUTIVO DE LA CANDIDATURA (Identidad ORH-UCR)\n- Nombre del Candidato: {st.session_state['nombre_candidato']}\n- Puesto al que postula: {st.session_state['nombre_puesto']}\n- Calificación Final: [Asignar nota del 1 al 10]\n- Estatus Sugerido: [PASAS A ENTREVISTA, ELEGIBLE EN RESERVA o NO PRESELECCIONADO]\n\n### 2. MATRIZ DE CALIFICACIÓN DETALLADA (Tabla)\n| Criterio de Evaluación | Requisito del Puesto | Perfil del Candidato | Nivel de Cumplimiento | Nota (1-10) y Justificación Técnica |\n\n### 3. ANÁLISIS CUALITATIVO INSTITUCIONAL\n- Fortalezas Clave para la UCR\n- Brechas / Puntos Ciegos Técnicos\n\n### 4. RECOMENDACIÓN FINAL DE LA ORH\n\n---\nPERFIL DEL PUESTO:\n{perfil_puesto if perfil_puesto else '[Vacío]'}\n\nCURRÍCULUM VITAE:\n{cv_final if cv_final else '[Vacío]'}"
+# 5. Construcción del Prompt (usa variables locales, no session_state inline)
+prompt_completo = f"""Actúa como un Consultor Experto en Reclutamiento y Selección de Personal de la Oficina de Recursos Humanos (ORH) de la Universidad de Costa Rica (UCR). Tu objetivo es realizar un análisis técnico con el rigor técnico institucional para evaluar el nivel de ajuste del candidato frente al perfil oficial.
+
+Por favor, genera un 'Reporte de Evaluación y Ajuste de Candidatos' estructurado con las siguientes secciones:
+
+### 1. RESUMEN EJECUTIVO DE LA CANDIDATURA (Identidad ORH-UCR)
+- Nombre del Candidato: {nombre_candidato}
+- Puesto al que postula: {nombre_puesto}
+- Calificación Final: [Asignar nota del 1 al 10]
+- Estatus Sugerido: [PASAS A ENTREVISTA, ELEGIBLE EN RESERVA o NO PRESELECCIONADO]
+
+### 2. MATRIZ DE CALIFICACIÓN DETALLADA (Tabla)
+| Criterio de Evaluación | Requisito del Puesto | Perfil del Candidato | Nivel de Cumplimiento | Nota (1-10) y Justificación Técnica |
+
+### 3. ANÁLISIS CUALITATIVO INSTITUCIONAL
+- Fortalezas Clave para la UCR
+- Brechas / Puntos Ciegos Técnicos
+
+### 4. RECOMENDACIÓN FINAL DE LA ORH
+
+---
+PERFIL DEL PUESTO:
+{perfil_puesto if perfil_puesto else '[Vacío]'}
+
+CURRÍCULUM VITAE:
+{cv_final if cv_final else '[Vacío]'}"""
 
 # 6. Zona de Herramientas del Prompt
+# FIX: se usa st.code + st.download_button en lugar de HTML con backticks
 st.markdown('<div class="section-header">⚙️ Herramientas de Transparencia del Algoritmo</div>', unsafe_allow_html=True)
 st.write("Presione el botón inferior si desea copiar el prompt exacto estructurado por el sistema:")
 
-prompt_escapado = prompt_completo.replace("\\", "\\\\").replace("`", "\\`")
-st.markdown(f"""
-    <button onclick="navigator.clipboard.writeText(`{prompt_escapado}`).then(() => alert('✅ Prompt copiado al portapapeles.'))"
-        style="background-color:#0076a8; color:white; border:none; border-radius:5px; padding:8px 16px; font-size:14px; cursor:pointer;">
-        📋 Copiar Prompt al Portapapeles
-    </button>
-""", unsafe_allow_html=True)
+# FIX: mostrar prompt en caja de texto copiable + botón de descarga como respaldo
+with st.expander("📄 Ver Prompt Completo"):
+    st.code(prompt_completo, language="markdown")
+
+st.download_button(
+    label="📋 Descargar Prompt como .txt",
+    data=prompt_completo,
+    file_name="prompt_AEP_ORH.txt",
+    mime="text/plain"
+)
 
 # 7. Ejecución del Reporte Final
 st.markdown("<br>", unsafe_allow_html=True)
